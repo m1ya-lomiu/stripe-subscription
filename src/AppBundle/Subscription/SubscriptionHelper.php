@@ -2,19 +2,32 @@
 
 namespace AppBundle\Subscription;
 
+use AppBundle\Entity\Subscription;
+use AppBundle\Entity\User;
+use Doctrine\ORM\EntityManager;
+
 class SubscriptionHelper
 {
     /** @var SubscriptionPlan[] */
     private $plans = [];
 
-    public function __construct()
+    /** @var EntityManager  */
+    private $em;
+
+    public function __construct(EntityManager $em)
     {
-        // todo - add the plans
-//        $this->plans[] = new SubscriptionPlan(
-//            'STRIPE_PLAN_KEY',
-//            'OUR PLAN NAME',
-//            'PRICE'
-//        );
+        $this->plans[] = new SubscriptionPlan(
+            'farmer_brent_monthly',
+            'Farmer Brent',
+            '99'
+        );
+        $this->plans[] = new SubscriptionPlan(
+            'new_zealander_monthly',
+            'New Zealander',
+            '199'
+        );
+
+        $this->em = $em;
     }
 
     /**
@@ -28,5 +41,38 @@ class SubscriptionHelper
                 return $plan;
             }
         }
+    }
+
+    public function addSubscriptionToUser(
+        \Stripe\Subscription $stripeSubscription,
+        User $user
+    ) {
+        $subscription = $user->getSubscription();
+        if (!$subscription) {
+            $subscription = new Subscription();
+            $subscription->setUser($user);
+        }
+
+        $periodEnd = \DateTime::createFromFormat('U', $stripeSubscription->current_period_end);
+
+        $subscription->activateSubscription(
+            $stripeSubscription->plan->id,
+            $stripeSubscription->id,
+            $periodEnd
+        );
+
+        $this->em->persist($subscription);
+        $this->em->flush($subscription);
+    }
+
+    public function updateCardDetails(User $user, \Stripe\Customer $stripeCustomer)
+    {
+        $cardDetails = $stripeCustomer->sources->data[0];
+
+        $user->setCardLast4($cardDetails->last4);
+        $user->setCardBrand($cardDetails->brand);
+
+        $this->em->persist($user);
+        $this->em->flush($user);
     }
 }

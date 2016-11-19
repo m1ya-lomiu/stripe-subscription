@@ -30,7 +30,16 @@ class OrderController extends BaseController
      */
     public function addSubscriptionToCartAction($planId)
     {
-        // todo - add the subscription plan to the cart!
+        $subscriptionHelper = $this->get('subscription_helper');
+        $plan = $subscriptionHelper->findPlan($planId);
+
+        if (!$plan) {
+            throw $this->createNotFoundException('Bad plan Id');
+        }
+
+        $this->get('shopping_cart')->addSubscription($planId);
+
+        return $this->redirectToRoute('order_checkout');
     }
 
     /**
@@ -78,10 +87,13 @@ class OrderController extends BaseController
         /** @var User $user */
         $user = $this->getUser();
         if (!$user->getStripeCustomerId()) {
-            $stripeClient->createCustomer($user, $token);
+            $stripeCustomer = $stripeClient->createCustomer($user, $token);
         } else {
-            $stripeClient->updateCustomerCard($user, $token);
+            $stripeCustomer = $stripeClient->updateCustomerCard($user, $token);
         }
+
+        $this->get('subscription_helper')
+            ->updateCardDetails($user, $stripeCustomer);
 
         $cart = $this->get('shopping_cart');
 
@@ -92,7 +104,18 @@ class OrderController extends BaseController
                 $product->getName()
             );
         }
-        $stripeClient->createInvoice($user, true);
+
+        if ($cart->getSubscriptionPlan()) {
+            $stripeSubscription = $stripeClient->createSubscription(
+                $user,
+                $cart->getSubscriptionPlan()
+            );
+
+            $this->get('subscription_helper')
+                ->addSubscriptionToUser($stripeSubscription, $user);
+        } else {
+            $stripeClient->createInvoice($user, true);
+        }
     }
 }
 

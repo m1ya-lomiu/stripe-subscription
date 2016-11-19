@@ -3,7 +3,9 @@
 namespace AppBundle;
 
 use AppBundle\Entity\User;
+use AppBundle\Subscription\SubscriptionPlan;
 use Doctrine\ORM\EntityManager;
+use Stripe\Subscription;
 
 class StripeClient
 {
@@ -36,13 +38,15 @@ class StripeClient
 
         $customer->source = $paymentToken;
         $customer->save();
+
+        return $customer;
     }
 
     public function createInvoiceItem($amount, User $user, $description)
     {
         return \Stripe\InvoiceItem::create(array(
             "amount" => $amount,
-            "currency" => "usd",
+            "currency" => "aud",
             "customer" => $user->getStripeCustomerId(),
             "description" => $description
         ));
@@ -60,5 +64,15 @@ class StripeClient
         }
 
         return $invoice;
+    }
+
+    public function createSubscription(User $user, SubscriptionPlan $plan)
+    {
+        $subscription = Subscription::create(array(
+            "customer" => $user->getStripeCustomerId(),
+            "plan" => $plan->getPlanId()
+        ));
+
+        return $subscription;
     }
 }

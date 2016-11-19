@@ -16,3 +16,4 @@ services:
     subscription_helper:
         class: AppBundle\Subscription\SubscriptionHelper
         autowire: true
+        autowire: true
